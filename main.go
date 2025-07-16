@@ -46,7 +46,7 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
-	if err := req.Body.Close(); err != nil {
+	if closeErr := req.Body.Close(); closeErr != nil {
 		http.Error(rw, "Failed to close request body", http.StatusInternalServerError)
 		return
 	}

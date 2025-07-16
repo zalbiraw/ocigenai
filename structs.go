@@ -1,7 +1,7 @@
 // Package ocigenai is a Traefik plugin to proxy requests to OCI Generative AI using Instance Principals.
 package ocigenai
 
-// Oracle Cloud request structures.
+// ServingMode represents the serving configuration for Oracle Cloud GenAI.
 type ServingMode struct {
 	ModelID     string `json:"modelId"`
 	ServingType string `json:"servingType"`
@@ -34,7 +34,7 @@ type OracleCloudRequest struct {
 	ChatRequest   ChatRequest `json:"chatRequest"`
 }
 
-// Oracle Cloud metadata response.
+// MetadataResponse represents the metadata response from Oracle Cloud.
 type MetadataResponse struct {
 	CertPem         string `json:"certPem"`
 	IntermediatePem string `json:"intermediatePem"`
