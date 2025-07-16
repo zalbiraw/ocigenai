@@ -1,12 +1,12 @@
-displayName: Demo Plugin
+displayName: ocigenai
 type: middleware
-iconPath: .assets/icon.png
-
-import: github.com/traefik/plugindemo
-
-summary: '[Demo] Add Request Header'
-
+import: github.com/zalbiraw/ocigenai
+summary: This plugin allows you to integrate your traefik proxy with OCI GenAI
 testData:
-  Headers:
-    X-Demo: test
-    X-URL: '{{URL}}'
+  compartmentId: asd
+  maxTokens: 600
+  temperature: 1.0
+  topP: 0.75
+  frequencyPenalty: 0.0
+  presencePenalty: 0.0
+  topK: 0
