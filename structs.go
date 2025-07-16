@@ -1,16 +1,18 @@
 // Package ocigenai is a Traefik plugin to proxy requests to OCI Generative AI using Instance Principals.
 package ocigenai
 
-// Oracle Cloud request structures
+// Oracle Cloud request structures.
 type ServingMode struct {
 	ModelID     string `json:"modelId"`
 	ServingType string `json:"servingType"`
 }
 
+// StreamOptions configures streaming behavior for chat requests.
 type StreamOptions struct {
 	IsIncludeUsage bool `json:"isIncludeUsage"`
 }
 
+// ChatRequest represents a chat completion request to Oracle Cloud GenAI.
 type ChatRequest struct {
 	MaxTokens        int           `json:"maxTokens"`
 	Temperature      float64       `json:"temperature"`
@@ -25,15 +27,16 @@ type ChatRequest struct {
 	APIFormat        string        `json:"apiFormat"`
 }
 
+// OracleCloudRequest represents the complete request structure for Oracle Cloud GenAI.
 type OracleCloudRequest struct {
 	CompartmentID string      `json:"compartmentId"`
 	ServingMode   ServingMode `json:"servingMode"`
 	ChatRequest   ChatRequest `json:"chatRequest"`
 }
 
-// Oracle Cloud metadata response
+// Oracle Cloud metadata response.
 type MetadataResponse struct {
-	CertPem         string `json:"cert.pem"`
-	IntermediatePem string `json:"intermediate.pem"`
-	KeyPem          string `json:"key.pem"`
+	CertPem         string `json:"certPem"`
+	IntermediatePem string `json:"intermediatePem"`
+	KeyPem          string `json:"keyPem"`
 }

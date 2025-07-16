@@ -17,7 +17,7 @@ import (
 // Test plugin creation with valid config
 func TestNew_ValidConfig(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
@@ -35,7 +35,7 @@ func TestNew_ValidConfig(t *testing.T) {
 // Test plugin creation with invalid config
 func TestNew_InvalidConfig(t *testing.T) {
 	cfg := CreateConfig()
-	// Missing CompartmentId
+	// Missing CompartmentID
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
@@ -53,7 +53,7 @@ func TestNew_InvalidConfig(t *testing.T) {
 // Test handling non-POST requests (should pass through)
 func TestServeHTTP_NonPostRequest(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 
 	ctx := context.Background()
 	nextCalled := false
@@ -84,7 +84,7 @@ func TestServeHTTP_NonPostRequest(t *testing.T) {
 // Test handling non-chat-completions path (should pass through)
 func TestServeHTTP_NonChatCompletionsPath(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 
 	ctx := context.Background()
 	nextCalled := false
@@ -115,7 +115,7 @@ func TestServeHTTP_NonChatCompletionsPath(t *testing.T) {
 // Test handling malformed JSON request body
 func TestServeHTTP_MalformedJSON(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -146,7 +146,7 @@ func TestServeHTTP_MalformedJSON(t *testing.T) {
 // Test successful request transformation and processing
 func TestServeHTTP_ValidRequest(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 	cfg.MaxTokens = 500
 	cfg.Temperature = 0.8
 
@@ -161,8 +161,8 @@ func TestServeHTTP_ValidRequest(t *testing.T) {
 		}
 
 		// Verify transformation
-		if oracleReq.CompartmentID != cfg.CompartmentId {
-			t.Errorf("expected compartmentId %s, got %s", cfg.CompartmentId, oracleReq.CompartmentID)
+		if oracleReq.CompartmentID != cfg.CompartmentID {
+			t.Errorf("expected compartmentId %s, got %s", cfg.CompartmentID, oracleReq.CompartmentID)
 		}
 		if oracleReq.ServingMode.ModelID != "gpt-3.5-turbo" {
 			t.Errorf("expected model gpt-3.5-turbo, got %s", oracleReq.ServingMode.ModelID)
@@ -178,7 +178,7 @@ func TestServeHTTP_ValidRequest(t *testing.T) {
 	})
 
 	// Mock getAuthHeaders to avoid OCI authentication in tests
-	originalProxy := &OCIGenAIProxy{
+	originalProxy := &Proxy{
 		next:   next,
 		config: cfg,
 		name:   "oci-genai-proxy",
@@ -193,7 +193,10 @@ func TestServeHTTP_ValidRequest(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(openAIReq)
+	body, err := json.Marshal(openAIReq)
+	if err != nil {
+		t.Fatalf("failed to marshal OpenAI request: %v", err)
+	}
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "/chat/completions", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 
@@ -201,8 +204,8 @@ func TestServeHTTP_ValidRequest(t *testing.T) {
 	transformedReq := originalProxy.transformRequest(openAIReq)
 
 	// Verify transformation logic
-	if transformedReq.CompartmentID != cfg.CompartmentId {
-		t.Errorf("expected compartmentId %s, got %s", cfg.CompartmentId, transformedReq.CompartmentID)
+	if transformedReq.CompartmentID != cfg.CompartmentID {
+		t.Errorf("expected compartmentId %s, got %s", cfg.CompartmentID, transformedReq.CompartmentID)
 	}
 	if transformedReq.ServingMode.ModelID != "gpt-3.5-turbo" {
 		t.Errorf("expected model gpt-3.5-turbo, got %s", transformedReq.ServingMode.ModelID)
@@ -218,9 +221,9 @@ func TestServeHTTP_ValidRequest(t *testing.T) {
 // Test request transformation with multiple messages
 func TestTransformRequest_MultipleMessages(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 
-	proxy := &OCIGenAIProxy{
+	proxy := &Proxy{
 		config: cfg,
 	}
 
@@ -248,13 +251,13 @@ func TestTransformRequest_MultipleMessages(t *testing.T) {
 // Test request transformation with config defaults
 func TestTransformRequest_ConfigDefaults(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 	cfg.MaxTokens = 500
 	cfg.Temperature = 0.9
 	cfg.TopP = 0.8
 	cfg.TopK = 10
 
-	proxy := &OCIGenAIProxy{
+	proxy := &Proxy{
 		config: cfg,
 	}
 
@@ -285,9 +288,9 @@ func TestTransformRequest_ConfigDefaults(t *testing.T) {
 // Test request transformation with OpenAI parameters override
 func TestTransformRequest_OpenAIOverrides(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 
-	proxy := &OCIGenAIProxy{
+	proxy := &Proxy{
 		config: cfg,
 	}
 
@@ -351,9 +354,9 @@ func TestCreateConfig(t *testing.T) {
 // Test request transformation with empty messages
 func TestTransformRequest_EmptyMessages(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 
-	proxy := &OCIGenAIProxy{
+	proxy := &Proxy{
 		config: cfg,
 	}
 
@@ -374,7 +377,7 @@ func TestTransformRequest_EmptyMessages(t *testing.T) {
 
 func TestServeHTTP_EmptyBody(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -399,7 +402,7 @@ func TestServeHTTP_EmptyBody(t *testing.T) {
 
 func TestServeHTTP_InvalidJSON(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
@@ -424,12 +427,12 @@ func TestServeHTTP_InvalidJSON(t *testing.T) {
 
 func TestTransformRequest_WithSystemMessage(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 	cfg.MaxTokens = 1000
 	cfg.Temperature = 0.7
 	cfg.TopP = 0.9
 
-	proxy := &OCIGenAIProxy{config: cfg}
+	proxy := &Proxy{config: cfg}
 
 	openAIReq := openai.ChatCompletionRequest{
 		Model: "gpt-4",
@@ -460,9 +463,9 @@ func TestTransformRequest_WithSystemMessage(t *testing.T) {
 
 func TestTransformRequest_EdgeCases(t *testing.T) {
 	cfg := CreateConfig()
-	cfg.CompartmentId = "test-compartment-id"
+	cfg.CompartmentID = "test-compartment-id"
 
-	proxy := &OCIGenAIProxy{config: cfg}
+	proxy := &Proxy{config: cfg}
 
 	// Test with only system message
 	openAIReq := openai.ChatCompletionRequest{

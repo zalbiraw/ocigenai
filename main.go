@@ -13,27 +13,27 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
-// OCIGenAIProxy a plugin to proxy to OCI GenAI.
-type OCIGenAIProxy struct {
+// Proxy a plugin to proxy to OCI GenAI.
+type Proxy struct {
 	next   http.Handler
 	config *Config
 	name   string
 }
 
-// New creates a new OCIGenAIProxy plugin.
+// New creates a new Proxy plugin.
 func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	if config.CompartmentId == "" {
+	if config.CompartmentID == "" {
 		return nil, fmt.Errorf("compartmentId cannot be empty")
 	}
 
-	return &OCIGenAIProxy{
+	return &Proxy{
 		next:   next,
 		config: config,
 		name:   name,
 	}, nil
 }
 
-func (p *OCIGenAIProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// Only process POST requests to /chat/completions
 	if req.Method != http.MethodPost || !strings.HasSuffix(req.URL.Path, "/chat/completions") {
 		p.next.ServeHTTP(rw, req)
@@ -46,11 +46,14 @@ func (p *OCIGenAIProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
-	req.Body.Close()
+	if err := req.Body.Close(); err != nil {
+		http.Error(rw, "Failed to close request body", http.StatusInternalServerError)
+		return
+	}
 
 	// Parse OpenAI request
 	var openAIReq openai.ChatCompletionRequest
-	if err := json.Unmarshal(body, &openAIReq); err != nil {
+	if unmarshalErr := json.Unmarshal(body, &openAIReq); unmarshalErr != nil {
 		http.Error(rw, "Failed to parse OpenAI request", http.StatusBadRequest)
 		return
 	}

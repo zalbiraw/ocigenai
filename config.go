@@ -3,7 +3,7 @@ package ocigenai
 
 // Config the plugin configuration.
 type Config struct {
-	CompartmentId    string  `json:"compartmentId,omitempty"`
+	CompartmentID    string  `json:"compartmentId,omitempty"`
 	MaxTokens        int     `json:"maxTokens,omitempty"`
 	Temperature      float64 `json:"temperature,omitempty"`
 	TopP             float64 `json:"topP,omitempty"`

@@ -3,7 +3,7 @@ package ocigenai
 
 import "github.com/sashabaranov/go-openai"
 
-func (p *OCIGenAIProxy) transformRequest(openAIReq openai.ChatCompletionRequest) OracleCloudRequest {
+func (p *Proxy) transformRequest(openAIReq openai.ChatCompletionRequest) OracleCloudRequest {
 	// Extract the last message as the prompt
 	message := ""
 	if len(openAIReq.Messages) > 0 {
@@ -39,7 +39,7 @@ func (p *OCIGenAIProxy) transformRequest(openAIReq openai.ChatCompletionRequest)
 	topK := p.config.TopK
 
 	return OracleCloudRequest{
-		CompartmentID: p.config.CompartmentId,
+		CompartmentID: p.config.CompartmentID,
 		ServingMode: ServingMode{
 			ModelID:     openAIReq.Model,
 			ServingType: "ON_DEMAND",

@@ -9,7 +9,7 @@ import (
 	"github.com/oracle/oci-go-sdk/v65/common/auth"
 )
 
-func (p *OCIGenAIProxy) getAuthHeaders(req *http.Request) error {
+func (p *Proxy) getAuthHeaders(req *http.Request) error {
 	// Create instance principal configuration provider
 	configProvider, err := auth.InstancePrincipalConfigurationProvider()
 	if err != nil {
