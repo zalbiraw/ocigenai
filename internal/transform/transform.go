@@ -4,7 +4,6 @@
 package transform
 
 import (
-	"github.com/sashabaranov/go-openai"
 	"github.com/zalbiraw/ocigenai/internal/config"
 	"github.com/zalbiraw/ocigenai/pkg/types"
 )
@@ -28,7 +27,7 @@ func New(cfg *config.Config) *Transformer {
 // 1. Extracts the last message from the conversation as the main prompt
 // 2. Uses OpenAI request parameters if provided, otherwise falls back to config defaults
 // 3. Constructs the Oracle Cloud request structure with proper serving mode and chat parameters.
-func (t *Transformer) ToOracleCloudRequest(openAIReq openai.ChatCompletionRequest) types.OracleCloudRequest {
+func (t *Transformer) ToOracleCloudRequest(openAIReq types.ChatCompletionRequest) types.OracleCloudRequest {
 	// Extract the last message as the prompt
 	// In a typical conversation, the last message is what we want to respond to
 	message := ""

@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/sashabaranov/go-openai"
 	"github.com/zalbiraw/ocigenai/internal/config"
+	"github.com/zalbiraw/ocigenai/pkg/types"
 )
 
 // abs returns the absolute value of a float64
@@ -34,9 +34,9 @@ func TestToOracleCloudRequest_BasicTransformation(t *testing.T) {
 
 	transformer := New(cfg)
 
-	openAIReq := openai.ChatCompletionRequest{
+	openAIReq := types.ChatCompletionRequest{
 		Model: "gpt-4",
-		Messages: []openai.ChatCompletionMessage{
+		Messages: []types.ChatCompletionMessage{
 			{Role: "user", Content: "Hello, world!"},
 		},
 	}
@@ -79,9 +79,9 @@ func TestToOracleCloudRequest_MultipleMessages(t *testing.T) {
 
 	transformer := New(cfg)
 
-	openAIReq := openai.ChatCompletionRequest{
+	openAIReq := types.ChatCompletionRequest{
 		Model: "gpt-3.5-turbo",
-		Messages: []openai.ChatCompletionMessage{
+		Messages: []types.ChatCompletionMessage{
 			{Role: "system", Content: "You are a helpful assistant."},
 			{Role: "user", Content: "Hello!"},
 			{Role: "assistant", Content: "Hi there!"},
@@ -104,9 +104,9 @@ func TestToOracleCloudRequest_EmptyMessages(t *testing.T) {
 
 	transformer := New(cfg)
 
-	openAIReq := openai.ChatCompletionRequest{
+	openAIReq := types.ChatCompletionRequest{
 		Model:    "gpt-4",
-		Messages: []openai.ChatCompletionMessage{},
+		Messages: []types.ChatCompletionMessage{},
 	}
 
 	result := transformer.ToOracleCloudRequest(openAIReq)
@@ -127,9 +127,9 @@ func TestToOracleCloudRequest_OpenAIOverrides(t *testing.T) {
 
 	transformer := New(cfg)
 
-	openAIReq := openai.ChatCompletionRequest{
+	openAIReq := types.ChatCompletionRequest{
 		Model: "gpt-4",
-		Messages: []openai.ChatCompletionMessage{
+		Messages: []types.ChatCompletionMessage{
 			{Role: "user", Content: "Test message"},
 		},
 		MaxTokens:        1000,
@@ -176,9 +176,9 @@ func TestToOracleCloudRequest_ConfigDefaults(t *testing.T) {
 
 	transformer := New(cfg)
 
-	openAIReq := openai.ChatCompletionRequest{
+	openAIReq := types.ChatCompletionRequest{
 		Model: "gpt-4",
-		Messages: []openai.ChatCompletionMessage{
+		Messages: []types.ChatCompletionMessage{
 			{Role: "user", Content: "Test message"},
 		},
 		// No overrides - should use config defaults
@@ -217,9 +217,9 @@ func TestToOracleCloudRequest_StreamingDefaults(t *testing.T) {
 
 	transformer := New(cfg)
 
-	openAIReq := openai.ChatCompletionRequest{
+	openAIReq := types.ChatCompletionRequest{
 		Model: "gpt-4",
-		Messages: []openai.ChatCompletionMessage{
+		Messages: []types.ChatCompletionMessage{
 			{Role: "user", Content: "Test message"},
 		},
 	}

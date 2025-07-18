@@ -1,6 +1,39 @@
 // Package types defines the data structures used throughout the OCI GenAI proxy plugin.
 package types
 
+// ChatCompletionMessage represents a message in a chat completion conversation.
+type ChatCompletionMessage struct {
+	// Role is the role of the author of this message (e.g., "user", "assistant", "system")
+	Role string `json:"role"`
+
+	// Content is the content of the message
+	Content string `json:"content"`
+}
+
+// ChatCompletionRequest represents a request to the OpenAI chat completion API.
+type ChatCompletionRequest struct {
+	// Model is the ID of the model to use
+	Model string `json:"model"`
+
+	// Messages is a list of messages comprising the conversation so far
+	Messages []ChatCompletionMessage `json:"messages"`
+
+	// MaxTokens is the maximum number of tokens to generate in the chat completion
+	MaxTokens int `json:"maxTokens,omitempty"`
+
+	// Temperature controls randomness (0.0 = deterministic, 2.0 = very random)
+	Temperature float32 `json:"temperature,omitempty"`
+
+	// TopP controls nucleus sampling
+	TopP float32 `json:"topP,omitempty"`
+
+	// FrequencyPenalty reduces repetition of tokens based on their frequency
+	FrequencyPenalty float32 `json:"frequencyPenalty,omitempty"`
+
+	// PresencePenalty reduces repetition of tokens based on their presence
+	PresencePenalty float32 `json:"presencePenalty,omitempty"`
+}
+
 // ServingMode represents the serving configuration for Oracle Cloud GenAI.
 // It specifies which model to use and how it should be served.
 type ServingMode struct {

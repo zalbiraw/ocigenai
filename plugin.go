@@ -21,10 +21,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/sashabaranov/go-openai"
 	"github.com/zalbiraw/ocigenai/internal/auth"
 	"github.com/zalbiraw/ocigenai/internal/config"
 	"github.com/zalbiraw/ocigenai/internal/transform"
+	"github.com/zalbiraw/ocigenai/pkg/types"
 )
 
 // Proxy represents the main plugin instance that handles request proxying.
@@ -112,7 +112,7 @@ func (p *Proxy) processOpenAIRequest(rw http.ResponseWriter, req *http.Request) 
 	}
 
 	// Parse OpenAI request
-	var openAIReq openai.ChatCompletionRequest
+	var openAIReq types.ChatCompletionRequest
 	if unmarshalErr := json.Unmarshal(body, &openAIReq); unmarshalErr != nil {
 		http.Error(rw, "Failed to parse OpenAI request", http.StatusBadRequest)
 		return unmarshalErr // Return the actual error for proper error handling

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sashabaranov/go-openai"
 	"github.com/zalbiraw/ocigenai/internal/config"
+	"github.com/zalbiraw/ocigenai/pkg/types"
 )
 
 func TestNew_ValidConfig(t *testing.T) {
@@ -163,9 +163,9 @@ func TestServeHTTP_ValidRequest(t *testing.T) {
 	}
 
 	// Create OpenAI request
-	openAIReq := openai.ChatCompletionRequest{
+	openAIReq := types.ChatCompletionRequest{
 		Model: "gpt-4",
-		Messages: []openai.ChatCompletionMessage{
+		Messages: []types.ChatCompletionMessage{
 			{Role: "user", Content: "Hello, world!"},
 		},
 	}
