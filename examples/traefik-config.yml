@@ -1,0 +1,47 @@
+# Example Traefik configuration for OCI GenAI Proxy Plugin
+# This shows how to configure the plugin in a real deployment
+
+# Static Configuration (traefik.yml)
+experimental:
+  plugins:
+    ocigenai:
+      moduleName: github.com/zalbiraw/ocigenai
+      version: v1.0.0
+
+# Dynamic Configuration (dynamic.yml)
+http:
+  middlewares:
+    oci-genai-proxy:
+      plugin:
+        ocigenai:
+          compartmentId: "ocid1.compartment.oc1..your-compartment-id"
+          maxTokens: 1000
+          temperature: 0.8
+          topP: 0.9
+          frequencyPenalty: 0.1
+          presencePenalty: 0.1
+          topK: 50
+
+  routers:
+    openai-to-oci:
+      rule: "Host(`your-domain.com`) && PathPrefix(`/v1/chat/completions`)"
+      service: oci-genai-service
+      middlewares:
+        - oci-genai-proxy
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    oci-genai-service:
+      loadBalancer:
+        servers:
+          - url: "https://generativeai.us-ashburn-1.oci.oraclecloud.com"
+
+# TLS Configuration
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: your-email@example.com
+      storage: acme.json
+      httpChallenge:
+        entryPoint: web

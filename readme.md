@@ -1,52 +1,222 @@
-This repository includes an example plugin, `demo`, for you to use as a reference for developing your own plugins.
+# OCI GenAI Proxy Plugin
 
-[![Build Status](https://github.com/traefik/plugindemo/workflows/Main/badge.svg?branch=master)](https://github.com/traefik/plugindemo/actions)
+[![Build Status](https://github.com/zalbiraw/ocigenai/workflows/Main/badge.svg?branch=master)](https://github.com/zalbiraw/ocigenai/actions)
 
-The existing plugins can be browsed into the [Plugin Catalog](https://plugins.traefik.io).
+A Traefik plugin that seamlessly proxies OpenAI API requests to Oracle Cloud Infrastructure (OCI) Generative AI service. This plugin transforms OpenAI ChatCompletion requests to OCI GenAI format and handles Instance Principal authentication automatically.
 
-# Developing a Traefik plugin
+## Features
 
-[Traefik](https://traefik.io) plugins are developed using the [Go language](https://golang.org).
+- **Seamless API Translation**: Converts OpenAI ChatCompletion requests to OCI GenAI format
+- **Instance Principal Authentication**: Automatic OCI authentication using Instance Principal credentials
+- **Certificate Caching**: Intelligent caching of OCI certificates with automatic refresh
+- **Thread-Safe**: Concurrent request handling with thread-safe credential management
+- **Configurable Parameters**: Customizable AI model parameters with sensible defaults
+- **No External Dependencies**: Custom OCI authentication implementation using only standard Go libraries
 
-A [Traefik](https://traefik.io) middleware plugin is just a [Go package](https://golang.org/ref/spec#Packages) that provides an `http.Handler` to perform specific processing of requests and responses.
+## Architecture
 
-Rather than being pre-compiled and linked, however, plugins are executed on the fly by [Yaegi](https://github.com/traefik/yaegi), an embedded Go interpreter.
+The plugin follows idiomatic Go project structure:
 
-## Usage
-
-For a plugin to be active for a given Traefik instance, it must be declared in the static configuration.
-
-Plugins are parsed and loaded exclusively during startup, which allows Traefik to check the integrity of the code and catch errors early on.
-If an error occurs during loading, the plugin is disabled.
-
-For security reasons, it is not possible to start a new plugin or modify an existing one while Traefik is running.
-
-Once loaded, middleware plugins behave exactly like statically compiled middlewares.
-Their instantiation and behavior are driven by the dynamic configuration.
-
-Plugin dependencies must be [vendored](https://golang.org/ref/mod#vendoring) for each plugin.
-Vendored packages should be included in the plugin's GitHub repository. ([Go modules](https://blog.golang.org/using-go-modules) are not supported.)
-
-### Configuration
-
-For each plugin, the Traefik static configuration must define the module name (as is usual for Go packages).
-
-The following declaration (given here in YAML) defines a plugin:
-
-```yaml
-# Static configuration
-
-experimental:
-  plugins:
-    example:
-      moduleName: github.com/traefik/plugindemo
-      version: v0.2.1
+```
+ocigenai/
+├── internal/              # Private application code
+│   ├── auth/             # OCI Instance Principal authentication
+│   ├── config/           # Configuration management
+│   └── transform/        # OpenAI to OCI request transformation
+├── pkg/                  # Public library code
+│   └── types/           # Shared data structures
+├── docs/                 # Documentation
+├── examples/             # Example configurations
+└── plugin.go            # Main plugin implementation
 ```
 
-Here is an example of a file provider dynamic configuration (given here in YAML), where the interesting part is the `http.middlewares` section:
+## Installation
+
+### Static Configuration
+
+Add the plugin to your Traefik static configuration:
+
+```yaml
+# traefik.yml
+experimental:
+  plugins:
+    ocigenai:
+      moduleName: github.com/zalbiraw/ocigenai
+      version: v1.0.0
+```
+
+### Dynamic Configuration
+
+Configure the plugin in your dynamic configuration:
 
 ```yaml
 # Dynamic configuration
+http:
+  middlewares:
+    oci-genai-proxy:
+      plugin:
+        ocigenai:
+          compartmentId: "ocid1.compartment.oc1..your-compartment-id"
+          maxTokens: 1000
+          temperature: 0.8
+          topP: 0.9
+          frequencyPenalty: 0.1
+          presencePenalty: 0.1
+          topK: 50
+
+  routers:
+    openai-to-oci:
+      rule: "Host(`your-domain.com`) && PathPrefix(`/v1/chat/completions`)"
+      service: oci-genai-service
+      middlewares:
+        - oci-genai-proxy
+
+  services:
+    oci-genai-service:
+      loadBalancer:
+        servers:
+          - url: "https://generativeai.us-ashburn-1.oci.oraclecloud.com"
+```
+
+## Configuration Options
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `compartmentId` | string | ✅ | - | OCI compartment ID where GenAI service is located |
+| `maxTokens` | int | ❌ | 600 | Maximum number of tokens to generate |
+| `temperature` | float64 | ❌ | 1.0 | Controls randomness (0.0-2.0) |
+| `topP` | float64 | ❌ | 0.75 | Nucleus sampling parameter (0.0-1.0) |
+| `frequencyPenalty` | float64 | ❌ | 0.0 | Frequency penalty (-2.0 to 2.0) |
+| `presencePenalty` | float64 | ❌ | 0.0 | Presence penalty (-2.0 to 2.0) |
+| `topK` | int | ❌ | 0 | Top-K sampling (0 = disabled) |
+
+## Usage
+
+Once configured, send OpenAI-compatible requests to your Traefik endpoint:
+
+```bash
+curl -X POST https://your-domain.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
+  -d '{
+    "model": "cohere.command-r-plus",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello, how are you?"
+      }
+    ],
+    "max_tokens": 150,
+    "temperature": 0.7
+  }'
+```
+
+The plugin will:
+1. Intercept the OpenAI request
+2. Transform it to OCI GenAI format
+3. Add Instance Principal authentication headers
+4. Forward to OCI GenAI service
+
+## Prerequisites
+
+- **OCI Instance Principal**: The plugin must run on an OCI compute instance with Instance Principal authentication configured
+- **OCI GenAI Service**: Access to Oracle Cloud Generative AI service in your compartment
+- **Traefik v2.5+**: Compatible with Traefik's plugin system
+
+## Development
+
+### Building
+
+```bash
+go build .
+```
+
+### Testing
+
+```bash
+# Run all tests
+go test ./...
+
+# Run tests with coverage
+go test -cover ./...
+
+# Run specific package tests
+go test ./internal/auth
+go test ./internal/config
+go test ./internal/transform
+```
+
+### Project Structure
+
+- **`internal/auth`**: OCI Instance Principal authentication with certificate caching
+- **`internal/config`**: Configuration management and validation
+- **`internal/transform`**: OpenAI to OCI GenAI request transformation
+- **`pkg/types`**: Shared data structures and types
+- **`plugin.go`**: Main plugin implementation and HTTP handler
+
+## Authentication
+
+The plugin uses OCI Instance Principal authentication, which requires:
+
+1. **Instance Principal Setup**: Configure your OCI compute instance for Instance Principal authentication
+2. **IAM Policies**: Ensure the instance has appropriate permissions for the GenAI service
+3. **Certificate Management**: The plugin automatically handles certificate fetching and caching
+
+### Certificate Caching
+
+The plugin implements intelligent certificate caching:
+- Certificates are cached until 1 hour before expiration
+- Thread-safe concurrent access
+- Automatic refresh on expiration
+- Fallback handling for soon-to-expire certificates
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"compartmentId cannot be empty"**
+   - Ensure `compartmentId` is set in your configuration
+
+2. **"failed to get instance metadata"**
+   - Verify Instance Principal is configured on your OCI instance
+   - Check network connectivity to metadata service (169.254.169.254)
+
+3. **"failed to authenticate request"**
+   - Verify IAM policies allow access to GenAI service
+   - Check certificate validity and expiration
+
+### Debug Mode
+
+Enable Traefik debug logging to see detailed plugin operation:
+
+```yaml
+log:
+  level: DEBUG
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Run the test suite
+6. Submit a pull request
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+For issues and questions:
+- Create an issue on GitHub
+- Check the [OCI documentation](https://docs.oracle.com/en-us/iaas/Content/generative-ai/home.htm) for GenAI service details
+- Review [Traefik plugin documentation](https://doc.traefik.io/traefik/plugins/)
+
+---
+
+**Note**: This plugin requires OCI Instance Principal authentication and must run on an OCI compute instance with appropriate IAM permissions
 
 http:
   routers:

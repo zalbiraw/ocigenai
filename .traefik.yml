@@ -3,7 +3,7 @@ type: middleware
 import: github.com/zalbiraw/ocigenai
 summary: This plugin allows you to integrate your traefik proxy with OCI GenAI
 testData:
-  compartmentId: asd
+  compartmentId: traefik
   maxTokens: 600
   temperature: 1.0
   topP: 0.75
