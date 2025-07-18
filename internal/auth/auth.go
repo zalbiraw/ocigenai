@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
@@ -64,16 +65,22 @@ func New() *Authenticator {
 // SignRequest adds OCI authentication headers to the given HTTP request.
 // It uses cached credentials when available or fetches fresh ones if needed.
 func (a *Authenticator) SignRequest(req *http.Request) error {
+	log.Printf("[Auth] Starting request signing for %s %s", req.Method, req.URL.Path)
+
 	// Get cached or fresh credentials
 	privateKey, keyID, err := a.getCredentials()
 	if err != nil {
+		log.Printf("[Auth] Failed to get credentials: %v", err)
 		return fmt.Errorf("failed to get credentials: %w", err)
 	}
+	log.Printf("[Auth] Credentials obtained successfully, keyID: %s", keyID)
 
 	// Sign the request with the credentials
 	if err := a.signRequest(req, privateKey, keyID); err != nil {
+		log.Printf("[Auth] Failed to sign request: %v", err)
 		return fmt.Errorf("failed to sign request: %w", err)
 	}
+	log.Printf("[Auth] Request signed successfully")
 
 	return nil
 }
@@ -87,9 +94,12 @@ func (a *Authenticator) getCredentials() (*rsa.PrivateKey, string, error) {
 		privateKey := a.cache.privateKey
 		keyID := a.cache.keyID
 		a.cache.mu.RUnlock()
+		log.Printf("[Auth] Using cached credentials, expires at: %v", a.cache.expiresAt)
 		return privateKey, keyID, nil
 	}
 	a.cache.mu.RUnlock()
+
+	log.Printf("[Auth] Credentials cache miss or expired, fetching fresh credentials")
 
 	// Need to refresh credentials (write lock)
 	a.cache.mu.Lock()
@@ -97,22 +107,26 @@ func (a *Authenticator) getCredentials() (*rsa.PrivateKey, string, error) {
 
 	// Double-check in case another goroutine already refreshed
 	if a.cache.metadata != nil && time.Now().Before(a.cache.expiresAt) {
+		log.Printf("[Auth] Another goroutine refreshed credentials, using cached")
 		return a.cache.privateKey, a.cache.keyID, nil
 	}
 
 	// Fetch fresh metadata from OCI Instance Metadata Service
+	log.Printf("[Auth] Fetching fresh instance metadata")
 	metadata, err := a.fetchInstanceMetadata()
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to fetch instance metadata: %w", err)
 	}
 
 	// Parse the private key from PEM format
+	log.Printf("[Auth] Parsing private key")
 	privateKey, err := parsePrivateKey(metadata.KeyPem)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to parse private key: %w", err)
 	}
 
 	// Extract key ID and certificate expiration time
+	log.Printf("[Auth] Extracting key ID and expiration")
 	keyID, expiresAt, err := extractKeyIDAndExpiration(metadata.CertPem)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to extract key ID and expiration: %w", err)
@@ -123,7 +137,10 @@ func (a *Authenticator) getCredentials() (*rsa.PrivateKey, string, error) {
 	if cacheExpiresAt.Before(time.Now()) {
 		// If certificate expires soon, cache for minimum time
 		cacheExpiresAt = time.Now().Add(minCacheBuffer)
+		log.Printf("[Auth] Certificate expires soon, using minimum cache buffer")
 	}
+
+	log.Printf("[Auth] Certificate expires at: %v, cache expires at: %v", expiresAt, cacheExpiresAt)
 
 	// Update cache
 	a.cache.metadata = metadata
@@ -131,29 +148,40 @@ func (a *Authenticator) getCredentials() (*rsa.PrivateKey, string, error) {
 	a.cache.keyID = keyID
 	a.cache.expiresAt = cacheExpiresAt
 
+	log.Printf("[Auth] Credentials cached successfully")
 	return privateKey, keyID, nil
 }
 
 // fetchInstanceMetadata retrieves certificates and private key from OCI Instance Metadata Service.
 func (a *Authenticator) fetchInstanceMetadata() (*types.InstanceMetadata, error) {
+	log.Printf("[Auth] Fetching instance metadata from OCI metadata service")
+	start := time.Now()
+
 	// Fetch certificate
+	log.Printf("[Auth] Fetching certificate from %s", certificateURL)
 	certPem, err := a.fetchMetadataEndpoint(certificateURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch certificate: %w", err)
 	}
+	log.Printf("[Auth] Certificate fetched successfully, size: %d bytes", len(certPem))
 
 	// Fetch intermediate certificate
+	log.Printf("[Auth] Fetching intermediate certificate from %s", intermediateURL)
 	intermediatePem, err := a.fetchMetadataEndpoint(intermediateURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch intermediate certificate: %w", err)
 	}
+	log.Printf("[Auth] Intermediate certificate fetched successfully, size: %d bytes", len(intermediatePem))
 
 	// Fetch private key
+	log.Printf("[Auth] Fetching private key from %s", privateKeyURL)
 	keyPem, err := a.fetchMetadataEndpoint(privateKeyURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch private key: %w", err)
 	}
+	log.Printf("[Auth] Private key fetched successfully, size: %d bytes", len(keyPem))
 
+	log.Printf("[Auth] All metadata fetched successfully in %v", time.Since(start))
 	return &types.InstanceMetadata{
 		CertPem:         string(certPem),
 		IntermediatePem: string(intermediatePem),
@@ -163,6 +191,7 @@ func (a *Authenticator) fetchInstanceMetadata() (*types.InstanceMetadata, error)
 
 // fetchMetadataEndpoint makes an authenticated request to an OCI metadata endpoint.
 func (a *Authenticator) fetchMetadataEndpoint(url string) ([]byte, error) {
+	log.Printf("[Auth] Making request to metadata endpoint: %s", url)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -171,22 +200,31 @@ func (a *Authenticator) fetchMetadataEndpoint(url string) ([]byte, error) {
 	// OCI metadata service requires this specific authorization header
 	req.Header.Set("Authorization", "Bearer Oracle")
 
+	start := time.Now()
 	resp, err := a.client.Do(req)
 	if err != nil {
+		log.Printf("[Auth] Request to %s failed: %v", url, err)
 		return nil, err
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
-			// Log error but don't fail the request - could add logging here if needed
-			_ = closeErr // Explicitly ignore the error to satisfy linter
+			log.Printf("[Auth] Failed to close response body: %v", closeErr)
 		}
 	}()
 
 	if resp.StatusCode != http.StatusOK {
+		log.Printf("[Auth] Metadata service returned status %d for %s", resp.StatusCode, url)
 		return nil, fmt.Errorf("metadata service returned status %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("[Auth] Failed to read response body from %s: %v", url, err)
+		return nil, err
+	}
+
+	log.Printf("[Auth] Successfully fetched %d bytes from %s in %v", len(body), url, time.Since(start))
+	return body, nil
 }
 
 // parsePrivateKey parses an RSA private key from PEM format.

@@ -26,7 +26,6 @@ ocigenai/
 ├── pkg/                  # Public library code
 │   └── types/           # Shared data structures
 ├── docs/                 # Documentation
-├── examples/             # Example configurations
 └── plugin.go            # Main plugin implementation
 ```
 

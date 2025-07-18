@@ -2,7 +2,10 @@
 // It handles plugin configuration with sensible defaults and validation.
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+)
 
 // Config represents the plugin configuration with all available options.
 // These settings control the behavior of the OCI GenAI proxy and provide
@@ -53,34 +56,51 @@ func New() *Config {
 // Validate checks if the configuration is valid and returns an error if not.
 // Currently, it only validates that the required CompartmentID is provided.
 func (c *Config) Validate() error {
+	log.Printf("[Config] Validating configuration")
+	log.Printf("[Config] CompartmentID: %s", c.CompartmentID)
+	log.Printf("[Config] MaxTokens: %d", c.MaxTokens)
+	log.Printf("[Config] Temperature: %f", c.Temperature)
+	log.Printf("[Config] TopP: %f", c.TopP)
+	log.Printf("[Config] FrequencyPenalty: %f", c.FrequencyPenalty)
+	log.Printf("[Config] PresencePenalty: %f", c.PresencePenalty)
+	log.Printf("[Config] TopK: %d", c.TopK)
+
 	if c.CompartmentID == "" {
+		log.Printf("[Config] Validation failed: compartmentId is required")
 		return fmt.Errorf("compartmentId is required and cannot be empty")
 	}
 
 	// Additional validation could be added here for parameter ranges
 	if c.Temperature < 0.0 || c.Temperature > 2.0 {
+		log.Printf("[Config] Validation failed: invalid temperature %f", c.Temperature)
 		return fmt.Errorf("temperature must be between 0.0 and 2.0, got %f", c.Temperature)
 	}
 
 	if c.TopP < 0.0 || c.TopP > 1.0 {
+		log.Printf("[Config] Validation failed: invalid topP %f", c.TopP)
 		return fmt.Errorf("topP must be between 0.0 and 1.0, got %f", c.TopP)
 	}
 
 	if c.FrequencyPenalty < -2.0 || c.FrequencyPenalty > 2.0 {
+		log.Printf("[Config] Validation failed: invalid frequencyPenalty %f", c.FrequencyPenalty)
 		return fmt.Errorf("frequencyPenalty must be between -2.0 and 2.0, got %f", c.FrequencyPenalty)
 	}
 
 	if c.PresencePenalty < -2.0 || c.PresencePenalty > 2.0 {
+		log.Printf("[Config] Validation failed: invalid presencePenalty %f", c.PresencePenalty)
 		return fmt.Errorf("presencePenalty must be between -2.0 and 2.0, got %f", c.PresencePenalty)
 	}
 
 	if c.MaxTokens < 1 {
+		log.Printf("[Config] Validation failed: invalid maxTokens %d", c.MaxTokens)
 		return fmt.Errorf("maxTokens must be greater than 0, got %d", c.MaxTokens)
 	}
 
 	if c.TopK < 0 {
+		log.Printf("[Config] Validation failed: invalid topK %d", c.TopK)
 		return fmt.Errorf("topK must be non-negative, got %d", c.TopK)
 	}
 
+	log.Printf("[Config] Configuration validation successful")
 	return nil
 }
