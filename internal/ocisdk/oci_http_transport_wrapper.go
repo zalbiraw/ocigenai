@@ -46,20 +46,20 @@ func (t *OciHTTPTransportWrapper) RoundTrip(req *http.Request) (*http.Response, 
 	return delegate.RoundTrip(req)
 }
 
-// // Refresh forces refresh of the underlying delegate.
-// func (t *OciHTTPTransportWrapper) Refresh(force bool) error {
-// 	_, err := t.refreshDelegate(force)
-// 	return err
-// }
+// Refresh forces refresh of the underlying delegate.
+func (t *OciHTTPTransportWrapper) Refresh(force bool) error {
+	_, err := t.refreshDelegate(force)
+	return err
+}
 
-// // Delegate returns the currently active http.RoundTripper.
-// // Might be nil.
-// func (t *OciHTTPTransportWrapper) Delegate() http.RoundTripper {
-// 	t.mux.RLock()
-// 	defer t.mux.RUnlock()
+// Delegate returns the currently active http.RoundTripper.
+// Might be nil.
+func (t *OciHTTPTransportWrapper) Delegate() http.RoundTripper {
+	t.mux.RLock()
+	defer t.mux.RUnlock()
 
-// 	return t.delegate
-// }
+	return t.delegate
+}
 
 // refreshDelegate refreshes the delegate (and its TLS config) if:
 //   - force is true
