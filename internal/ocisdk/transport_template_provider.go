@@ -23,11 +23,12 @@ func DefaultTransport(tlsClientConfig *tls.Config) (*http.Transport, error) {
 	transport := CloneHTTPDefaultTransport()
 	if isExpectHeaderDisabled := IsEnvVarFalse(UsingExpectHeaderEnvVar); !isExpectHeaderDisabled {
 		transport.Proxy = http.ProxyFromEnvironment
-		transport.DialContext = (&net.Dialer{
+		dialer := &net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
-		}).DialContext
+		}
+		transport.DialContext = dialer.DialContext
 		transport.ForceAttemptHTTP2 = true
 		transport.MaxIdleConns = 100
 		transport.IdleConnTimeout = 90 * time.Second
