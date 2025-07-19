@@ -95,7 +95,11 @@ func (t *OciHTTPTransportWrapper) refreshDelegate(force bool) (http.RoundTripper
 		return nil, fmt.Errorf("refreshing tls.Config from template: %w", err)
 	}
 
-	t.delegate, err = t.TransportTemplate.NewOrDefault(tlsConfig)
+	if t.TransportTemplate != nil {
+		t.delegate, err = t.TransportTemplate(tlsConfig)
+	} else {
+		t.delegate, err = DefaultTransport(tlsConfig)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("refreshing http.RoundTripper from template: %w", err)
 	}

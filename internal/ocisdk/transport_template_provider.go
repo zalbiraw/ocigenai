@@ -14,15 +14,6 @@ import (
 // from a given TLS client config.
 type TransportTemplateProvider func(tlsClientConfig *tls.Config) (http.RoundTripper, error)
 
-// NewOrDefault creates a new TransportTemplate
-// If t is nil, then DefaultTransport is returned
-func (t TransportTemplateProvider) NewOrDefault(tlsClientConfig *tls.Config) (http.RoundTripper, error) {
-	if t == nil {
-		return DefaultTransport(tlsClientConfig)
-	}
-	return t(tlsClientConfig)
-}
-
 // DefaultTransport creates a clone of http.DefaultTransport
 // and applies the tlsClientConfig on top of it.
 // The result is never nil, to prevent panics in client code.
