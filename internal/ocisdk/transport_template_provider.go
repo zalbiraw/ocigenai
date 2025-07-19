@@ -4,6 +4,7 @@
 package ocisdk
 
 import (
+	"context"
 	"crypto/tls"
 	"net"
 	"net/http"
@@ -28,7 +29,9 @@ func DefaultTransport(tlsClientConfig *tls.Config) (*http.Transport, error) {
 			KeepAlive: 30 * time.Second,
 			DualStack: true,
 		}
-		transport.DialContext = dialer.DialContext
+		transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+			return dialer.DialContext(ctx, network, address)
+		}
 		transport.ForceAttemptHTTP2 = true
 		transport.MaxIdleConns = 100
 		transport.IdleConnTimeout = 90 * time.Second
