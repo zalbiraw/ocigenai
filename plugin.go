@@ -23,8 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zalbiraw/ocigenai/internal/auth"
 	"github.com/zalbiraw/ocigenai/internal/config"
+	"github.com/zalbiraw/ocigenai/internal/ocisdk"
 	"github.com/zalbiraw/ocigenai/internal/transform"
 	"github.com/zalbiraw/ocigenai/pkg/types"
 )
@@ -36,7 +36,7 @@ type Proxy struct {
 	config        *config.Config         // Plugin configuration
 	name          string                 // Plugin instance name
 	transformer   *transform.Transformer // Request transformer
-	authenticator *auth.Authenticator    // OCI authenticator
+	authenticator *ocisdk.Authenticator  // OCI authenticator
 }
 
 // New creates a new Proxy plugin instance.
@@ -63,7 +63,7 @@ func New(ctx context.Context, next http.Handler, cfg *config.Config, name string
 	log.Printf("[%s] Initializing transformer", name)
 	transformer := transform.New(cfg)
 	log.Printf("[%s] Initializing authenticator", name)
-	authenticator := auth.New()
+	authenticator := ocisdk.New()
 
 	log.Printf("[%s] Plugin initialization completed successfully", name)
 	return &Proxy{

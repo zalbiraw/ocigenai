@@ -1,4 +1,4 @@
-package auth
+package ocisdk
 
 import (
 	"crypto/rand"
@@ -229,6 +229,20 @@ func TestBuildSigningString(t *testing.T) {
 	}
 }
 
+// testKeyProvider implements KeyProvider for testing
+type testKeyProvider struct {
+	privateKey *rsa.PrivateKey
+	keyID      string
+}
+
+func (tkp *testKeyProvider) PrivateRSAKey() (*rsa.PrivateKey, error) {
+	return tkp.privateKey, nil
+}
+
+func (tkp *testKeyProvider) KeyID() (string, error) {
+	return tkp.keyID, nil
+}
+
 func TestSignRequest(t *testing.T) {
 	expiresAt := time.Now().Add(24 * time.Hour)
 	certPEM, keyPEM := generateTestCertAndKey(t, expiresAt)
@@ -243,13 +257,24 @@ func TestSignRequest(t *testing.T) {
 		t.Fatalf("failed to extract key ID: %v", err)
 	}
 
-	auth := New()
+	// Create a test key provider
+	keyProvider := &testKeyProvider{
+		privateKey: privateKey,
+		keyID:      keyID,
+	}
+
+	// Create a signer using the OCI auth code
+	signer := DefaultRequestSigner(keyProvider)
+
 	req, err := http.NewRequest(http.MethodPost, "https://generativeai.us-ashburn-1.oci.oraclecloud.com/20240101/actions/generateText", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
 
-	err = auth.signRequest(req, privateKey, keyID)
+	// Set date header before signing
+	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
+
+	err = signer.Sign(req)
 	if err != nil {
 		t.Fatalf("failed to sign request: %v", err)
 	}
@@ -272,7 +297,8 @@ func TestSignRequest(t *testing.T) {
 		t.Error("authorization header missing algorithm")
 	}
 
-	if !strings.Contains(authHeader, "headers=\"(request-target) host date\"") {
+	// The OCI signer includes body headers for POST requests: "date (request-target) host content-length content-type x-content-sha256"
+	if !strings.Contains(authHeader, "headers=\"date (request-target) host content-length content-type x-content-sha256\"") {
 		t.Error("authorization header missing headers list")
 	}
 

@@ -1,7 +1,10 @@
 // Copyright (c) 2016, 2018, 2025, Oracle and/or its affiliates.  All rights reserved.
 // This software is dual-licensed to you under the Universal Permissive License (UPL) 1.0 as shown at https://oss.oracle.com/licenses/upl or Apache License 2.0 as shown at http://www.apache.org/licenses/LICENSE-2.0. You may choose either license.
 
-package auth
+// Package ocisdk provides utilities for signing HTTP requests according to OCI requirements.
+//
+//nolint:ireturn
+package ocisdk
 
 import (
 	"bytes"
@@ -12,17 +15,16 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 )
 
-// HTTPRequestSigner the interface to sign a request
+// HTTPRequestSigner the interface to sign a request.
 type HTTPRequestSigner interface {
 	Sign(r *http.Request) error
 }
 
-// KeyProvider interface that wraps information about the key's account owner
+// KeyProvider interface that wraps information about the key's account owner.
 type KeyProvider interface {
 	PrivateRSAKey() (*rsa.PrivateKey, error)
 	KeyID() (string, error)
@@ -31,7 +33,7 @@ type KeyProvider interface {
 const signerVersion = "1"
 
 // SignerBodyHashPredicate a function that allows to disable/enable body hashing
-// of requests and headers associated with body content
+// of requests and headers associated with body content.
 type SignerBodyHashPredicate func(r *http.Request) bool
 
 // ociRequestSigner implements the http-signatures-draft spec
@@ -43,27 +45,33 @@ type ociRequestSigner struct {
 	ShouldHashBody SignerBodyHashPredicate
 }
 
-var (
-	defaultGenericHeaders    = []string{"date", "(request-target)", "host"}
-	defaultBodyHeaders       = []string{"content-length", "content-type", "x-content-sha256"}
-	defaultBodyHashPredicate = func(r *http.Request) bool {
-		return r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch
-	}
-)
-
-// DefaultGenericHeaders list of default generic headers that is used in signing
-func DefaultGenericHeaders() []string {
-	return makeACopy(defaultGenericHeaders)
+func getDefaultGenericHeaders() []string {
+	return []string{"date", "(request-target)", "host"}
 }
 
-// DefaultBodyHeaders list of default body headers that is used in signing
+func getDefaultBodyHeaders() []string {
+	return []string{"content-length", "content-type", "x-content-sha256"}
+}
+
+func getDefaultBodyHashPredicate() SignerBodyHashPredicate {
+	return func(r *http.Request) bool {
+		return r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch
+	}
+}
+
+// DefaultGenericHeaders list of default generic headers that is used in signing.
+func DefaultGenericHeaders() []string {
+	return makeACopy(getDefaultGenericHeaders())
+}
+
+// DefaultBodyHeaders list of default body headers that is used in signing.
 func DefaultBodyHeaders() []string {
-	return makeACopy(defaultBodyHeaders)
+	return makeACopy(getDefaultBodyHeaders())
 }
 
 // DefaultRequestSigner creates a signer with default parameters.
 func DefaultRequestSigner(provider KeyProvider) HTTPRequestSigner {
-	return RequestSigner(provider, defaultGenericHeaders, defaultBodyHeaders)
+	return RequestSigner(provider, getDefaultGenericHeaders(), getDefaultBodyHeaders())
 }
 
 // RequestSignerExcludeBody creates a signer without hash the body.
@@ -72,11 +80,11 @@ func RequestSignerExcludeBody(provider KeyProvider) HTTPRequestSigner {
 		// week request signer will not hash the body
 		return false
 	}
-	return RequestSignerWithBodyHashingPredicate(provider, defaultGenericHeaders, defaultBodyHeaders, bodyHashPredicate)
+	return RequestSignerWithBodyHashingPredicate(provider, getDefaultGenericHeaders(), getDefaultBodyHeaders(), bodyHashPredicate)
 }
 
 // NewSignerFromOCIRequestSigner creates a copy of the request signer and attaches the new SignerBodyHashPredicate
-// returns an error if the passed signer is not of type ociRequestSigner
+// returns an error if the passed signer is not of type ociRequestSigner.
 func NewSignerFromOCIRequestSigner(oldSigner HTTPRequestSigner, predicate SignerBodyHashPredicate) (HTTPRequestSigner, error) {
 	if oldS, ok := oldSigner.(ociRequestSigner); ok {
 		s := ociRequestSigner{
@@ -86,29 +94,30 @@ func NewSignerFromOCIRequestSigner(oldSigner HTTPRequestSigner, predicate Signer
 			ShouldHashBody: predicate,
 		}
 		return s, nil
-
 	}
 	return nil, fmt.Errorf("can not create a signer, input signer needs to be of type ociRequestSigner")
 }
 
 // RequestSigner creates a signer that utilizes the specified headers for signing
-// and the default predicate for using the body of the request as part of the signature
+// and the default predicate for using the body of the request as part of the signature.
 func RequestSigner(provider KeyProvider, genericHeaders, bodyHeaders []string) HTTPRequestSigner {
 	return ociRequestSigner{
 		KeyProvider:    provider,
 		GenericHeaders: genericHeaders,
 		BodyHeaders:    bodyHeaders,
-		ShouldHashBody: defaultBodyHashPredicate}
+		ShouldHashBody: getDefaultBodyHashPredicate(),
+	}
 }
 
 // RequestSignerWithBodyHashingPredicate creates a signer that utilizes the specified headers for signing, as well as a predicate for using
-// the body of the request and bodyHeaders parameter as part of the signature
+// the body of the request and bodyHeaders parameter as part of the signature.
 func RequestSignerWithBodyHashingPredicate(provider KeyProvider, genericHeaders, bodyHeaders []string, shouldHashBody SignerBodyHashPredicate) HTTPRequestSigner {
 	return ociRequestSigner{
 		KeyProvider:    provider,
 		GenericHeaders: genericHeaders,
 		BodyHeaders:    bodyHeaders,
-		ShouldHashBody: shouldHashBody}
+		ShouldHashBody: shouldHashBody,
+	}
 }
 
 func (signer ociRequestSigner) getSigningHeaders(r *http.Request) []string {
@@ -144,7 +153,6 @@ func (signer ociRequestSigner) getSigningString(request *http.Request) string {
 
 	signingString := strings.Join(signingParts, "\n")
 	return signingString
-
 }
 
 func getRequestTarget(request *http.Request) string {
@@ -152,14 +160,14 @@ func getRequestTarget(request *http.Request) string {
 	return fmt.Sprintf("%s %s", lowercaseMethod, request.URL.RequestURI())
 }
 
-func calculateHashOfBody(request *http.Request) (err error) {
+func calculateHashOfBody(request *http.Request) error {
 	var hash string
-	hash, err = GetBodyHash(request)
+	hash, err := GetBodyHash(request)
 	if err != nil {
-		return
+		return err
 	}
 	request.Header.Set(requestHeaderXContentSHA256, hash)
-	return
+	return nil
 }
 
 // drainBody reads all of b to memory and then returns two equivalent
@@ -167,19 +175,19 @@ func calculateHashOfBody(request *http.Request) (err error) {
 //
 // It returns an error if the initial slurp of all bytes fails. It does not attempt
 // to make the returned ReadClosers have identical error-matching behavior.
-func drainBody(b io.ReadCloser) (r1, r2 io.ReadCloser, err error) {
+func drainBody(b io.ReadCloser) (io.ReadCloser, io.ReadCloser, error) {
 	if b == http.NoBody {
 		// No copying needed. Preserve the magic sentinel meaning of NoBody.
 		return http.NoBody, http.NoBody, nil
 	}
 	var buf bytes.Buffer
-	if _, err = buf.ReadFrom(b); err != nil {
+	if _, err := buf.ReadFrom(b); err != nil {
 		return nil, b, err
 	}
-	if err = b.Close(); err != nil {
+	if err := b.Close(); err != nil {
 		return nil, b, err
 	}
-	return ioutil.NopCloser(&buf), ioutil.NopCloser(bytes.NewReader(buf.Bytes())), nil
+	return io.NopCloser(&buf), io.NopCloser(bytes.NewReader(buf.Bytes())), nil
 }
 
 func hashAndEncode(data []byte) string {
@@ -188,8 +196,8 @@ func hashAndEncode(data []byte) string {
 	return hash
 }
 
-// GetBodyHash creates a base64 string from the hash of body the request
-func GetBodyHash(request *http.Request) (hashString string, err error) {
+// GetBodyHash creates a base64 string from the hash of body the request.
+func GetBodyHash(request *http.Request) (string, error) {
 	if request.Body == nil {
 		request.ContentLength = 0
 		request.Header.Set(requestHeaderContentLength, fmt.Sprintf("%v", request.ContentLength))
@@ -198,25 +206,26 @@ func GetBodyHash(request *http.Request) (hashString string, err error) {
 
 	var data []byte
 	var bReader io.Reader
+	var err error
 	bReader, request.Body, err = drainBody(request.Body)
 	if err != nil {
-		return "", fmt.Errorf("can not read body of request while calculating body hash: %s", err.Error())
+		return "", fmt.Errorf("can not read body of request while calculating body hash: %w", err)
 	}
 
-	data, err = ioutil.ReadAll(bReader)
+	data, err = io.ReadAll(bReader)
 	if err != nil {
-		return "", fmt.Errorf("can not read body of request while calculating body hash: %s", err.Error())
+		return "", fmt.Errorf("can not read body of request while calculating body hash: %w", err)
 	}
 
 	// Since the request can be coming from a binary body. Make an attempt to set the body length
 	request.ContentLength = int64(len(data))
 	request.Header.Set(requestHeaderContentLength, fmt.Sprintf("%v", request.ContentLength))
 
-	hashString = hashAndEncode(data)
-	return
+	hashString := hashAndEncode(data)
+	return hashString, nil
 }
 
-func (signer ociRequestSigner) computeSignature(request *http.Request) (signature string, err error) {
+func (signer ociRequestSigner) computeSignature(request *http.Request) (string, error) {
 	signingString := signer.getSigningString(request)
 	hasher := sha256.New()
 	hasher.Write([]byte(signingString))
@@ -224,41 +233,42 @@ func (signer ociRequestSigner) computeSignature(request *http.Request) (signatur
 
 	privateKey, err := signer.KeyProvider.PrivateRSAKey()
 	if err != nil {
-		return
+		return "", err
 	}
 
 	var unencodedSig []byte
 	unencodedSig, e := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hashed)
 	if e != nil {
-		err = fmt.Errorf("can not compute signature while signing the request %s: ", e.Error())
-		return
+		err := fmt.Errorf("can not compute signature while signing the request: %w", e)
+		return "", err
 	}
 
-	signature = base64.StdEncoding.EncodeToString(unencodedSig)
-	return
+	signature := base64.StdEncoding.EncodeToString(unencodedSig)
+	return signature, nil
 }
 
 // Sign signs the http request, by inspecting the necessary headers. Once signed
 // the request will have the proper 'Authorization' header set, otherwise
-// and error is returned
-func (signer ociRequestSigner) Sign(request *http.Request) (err error) {
+// and error is returned.
+func (signer ociRequestSigner) Sign(request *http.Request) error {
 	if signer.ShouldHashBody(request) {
-		err = calculateHashOfBody(request)
+		err := calculateHashOfBody(request)
 		if err != nil {
-			return
+			return err
 		}
 	}
 
 	var signature string
+	var err error
 	if signature, err = signer.computeSignature(request); err != nil {
-		return
+		return err
 	}
 
 	signingHeaders := strings.Join(signer.getSigningHeaders(request), " ")
 
 	var keyID string
 	if keyID, err = signer.KeyProvider.KeyID(); err != nil {
-		return
+		return err
 	}
 
 	authValue := fmt.Sprintf("Signature version=\"%s\",headers=\"%s\",keyId=\"%s\",algorithm=\"rsa-sha256\",signature=\"%s\"",
@@ -266,5 +276,5 @@ func (signer ociRequestSigner) Sign(request *http.Request) (err error) {
 
 	request.Header.Set(requestHeaderAuthorization, authValue)
 
-	return
+	return nil
 }

@@ -1,4 +1,4 @@
-package auth
+package ocisdk
 
 const (
 	requestHeaderXContentSHA256 = "X-Content-SHA256"

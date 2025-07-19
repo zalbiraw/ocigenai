@@ -1,15 +1,11 @@
-// Package auth provides Oracle Cloud Infrastructure (OCI) Instance Principal authentication
+// Package ocisdk provides Oracle Cloud Infrastructure (OCI) Instance Principal authentication
 // for the OCI GenAI proxy plugin. It implements custom OCI request signing without
 // requiring the official OCI SDK, using only standard Go libraries.
-package auth
+package ocisdk
 
 import (
-	"crypto"
-	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
-	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -50,16 +46,43 @@ type CachedCredentials struct {
 type Authenticator struct {
 	cache  *CachedCredentials
 	client *http.Client
+	signer HTTPRequestSigner
+}
+
+// instancePrincipalKeyProvider implements the KeyProvider interface
+// using cached instance principal credentials.
+type instancePrincipalKeyProvider struct {
+	auth *Authenticator
+}
+
+// PrivateRSAKey returns the cached private key.
+func (kp *instancePrincipalKeyProvider) PrivateRSAKey() (*rsa.PrivateKey, error) {
+	privateKey, _, err := kp.auth.getCredentials()
+	return privateKey, err
+}
+
+// KeyID returns the cached key ID.
+func (kp *instancePrincipalKeyProvider) KeyID() (string, error) {
+	_, keyID, err := kp.auth.getCredentials()
+	return keyID, err
 }
 
 // New creates a new authenticator with default settings.
 func New() *Authenticator {
-	return &Authenticator{
+	auth := &Authenticator{
 		cache: &CachedCredentials{},
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
 	}
+
+	// Create a key provider that uses this authenticator's credentials
+	keyProvider := &instancePrincipalKeyProvider{auth: auth}
+
+	// Create the OCI request signer using the key provider
+	auth.signer = DefaultRequestSigner(keyProvider)
+
+	return auth
 }
 
 // SignRequest adds OCI authentication headers to the given HTTP request.
@@ -67,21 +90,13 @@ func New() *Authenticator {
 func (a *Authenticator) SignRequest(req *http.Request) error {
 	log.Printf("[Auth] Starting request signing for %s %s", req.Method, req.URL.Path)
 
-	// Get cached or fresh credentials
-	privateKey, keyID, err := a.getCredentials()
-	if err != nil {
-		log.Printf("[Auth] Failed to get credentials: %v", err)
-		return fmt.Errorf("failed to get credentials: %w", err)
-	}
-	log.Printf("[Auth] Credentials obtained successfully, keyID: %s", keyID)
-
-	// Sign the request with the credentials
-	if err := a.signRequest(req, privateKey, keyID); err != nil {
+	// Use the OCI request signer to sign the request
+	if err := a.signer.Sign(req); err != nil {
 		log.Printf("[Auth] Failed to sign request: %v", err)
 		return fmt.Errorf("failed to sign request: %w", err)
 	}
-	log.Printf("[Auth] Request signed successfully")
 
+	log.Printf("[Auth] Request signed successfully")
 	return nil
 }
 
@@ -283,36 +298,6 @@ func extractKeyIDAndExpiration(certPem string) (string, time.Time, error) {
 	}
 
 	return keyID, cert.NotAfter, nil
-}
-
-// signRequest signs an HTTP request according to OCI specification.
-// It creates a signature using RSA-SHA256 and adds the appropriate headers.
-func (a *Authenticator) signRequest(req *http.Request, privateKey *rsa.PrivateKey, keyID string) error {
-	// Build the signing string according to OCI specification
-	signingString := a.buildSigningString(req)
-
-	// Create SHA-256 hash of the signing string
-	hashed := sha256.Sum256([]byte(signingString))
-
-	// Sign the hash using RSA-PKCS1v15
-	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hashed[:])
-	if err != nil {
-		return fmt.Errorf("failed to sign request: %w", err)
-	}
-
-	// Encode signature to base64
-	encodedSignature := base64.StdEncoding.EncodeToString(signature)
-
-	// Set OCI authorization header
-	authorization := fmt.Sprintf(
-		`Signature version="1",keyId="%s",algorithm="rsa-sha256",headers="(request-target) host date",signature="%s"`,
-		keyID, encodedSignature,
-	)
-
-	req.Header.Set("Authorization", authorization)
-	req.Header.Set("Date", time.Now().UTC().Format(http.TimeFormat))
-
-	return nil
 }
 
 // buildSigningString constructs the signing string according to OCI specification.
