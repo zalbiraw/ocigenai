@@ -21,7 +21,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/zalbiraw/ocigenai/internal/config"
 	"github.com/zalbiraw/ocigenai/internal/ocisdk"
@@ -50,22 +49,14 @@ type Proxy struct {
 //
 // Returns the configured plugin handler or an error if configuration is invalid.
 func New(ctx context.Context, next http.Handler, cfg *config.Config, name string) (http.Handler, error) {
-	log.Printf("[%s] Initializing OCI GenAI proxy plugin", name)
-
-	// Validate configuration
-	log.Printf("[%s] Validating configuration", name)
 	if err := cfg.Validate(); err != nil {
-		log.Printf("[%s] Configuration validation failed: %v", name, err)
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	// Initialize components
-	log.Printf("[%s] Initializing transformer", name)
 	transformer := transform.New(cfg)
-	log.Printf("[%s] Initializing authenticator", name)
 	authenticator := ocisdk.New()
 
-	log.Printf("[%s] Plugin initialization completed successfully", name)
 	return &Proxy{
 		next:          next,
 		config:        cfg,
@@ -95,17 +86,11 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	log.Printf("[%s] Processing OpenAI request", p.name)
-	start := time.Now()
-
 	// Process the OpenAI request
 	if err := p.processOpenAIRequest(rw, req); err != nil {
-		log.Printf("[%s] Request processing failed: %v", p.name, err)
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	log.Printf("[%s] Request processing completed in %v", p.name, time.Since(start))
 
 	// Forward to next handler
 	p.next.ServeHTTP(rw, req)
@@ -114,19 +99,16 @@ func (p *Proxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 // shouldProcessRequest determines if a request should be processed by this plugin.
 func (p *Proxy) shouldProcessRequest(req *http.Request) bool {
 	shouldProcess := req.Method == http.MethodPost && strings.HasSuffix(req.URL.Path, "/chat/completions")
-	log.Printf("[%s] Request filtering: method=%s, path=%s, shouldProcess=%v", p.name, req.Method, req.URL.Path, shouldProcess)
 	return shouldProcess
 }
 
 // processOpenAIRequest handles the transformation and authentication of OpenAI requests.
 func (p *Proxy) processOpenAIRequest(rw http.ResponseWriter, req *http.Request) error {
 	// Read the request body
-	log.Printf("[%s] Reading request body", p.name)
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read request body: %w", err)
 	}
-	log.Printf("[%s] Request body size: %d bytes", p.name, len(body))
 
 	// Close the original body
 	if closeErr := req.Body.Close(); closeErr != nil {
@@ -134,7 +116,6 @@ func (p *Proxy) processOpenAIRequest(rw http.ResponseWriter, req *http.Request) 
 	}
 
 	// Parse OpenAI request
-	log.Printf("[%s] Parsing OpenAI request", p.name)
 	var openAIReq types.ChatCompletionRequest
 	if unmarshalErr := json.Unmarshal(body, &openAIReq); unmarshalErr != nil {
 		log.Printf("[%s] Failed to parse OpenAI request: %v", p.name, unmarshalErr)
@@ -144,30 +125,27 @@ func (p *Proxy) processOpenAIRequest(rw http.ResponseWriter, req *http.Request) 
 	log.Printf("[%s] OpenAI request parsed successfully: model=%s, messages=%d", p.name, openAIReq.Model, len(openAIReq.Messages))
 
 	// Transform to Oracle Cloud format
-	log.Printf("[%s] Transforming to Oracle Cloud format", p.name)
 	oracleReq := p.transformer.ToOracleCloudRequest(openAIReq)
 
 	// Marshal the Oracle Cloud request
-	log.Printf("[%s] Marshaling Oracle Cloud request", p.name)
 	oracleBody, err := json.Marshal(oracleReq)
 	if err != nil {
 		return fmt.Errorf("failed to marshal Oracle Cloud request: %w", err)
 	}
-	log.Printf("[%s] Oracle Cloud request size: %d bytes", p.name, len(oracleBody))
 
 	// Replace request body with transformed content
 	req.Body = io.NopCloser(bytes.NewReader(oracleBody))
 	req.ContentLength = int64(len(oracleBody))
 	req.Header.Set("Content-Type", "application/json")
-	log.Printf("[%s] Request body replaced with transformed content", p.name)
 
 	// Add OCI authentication headers
-	log.Printf("[%s] Adding OCI authentication headers", p.name)
 	if err := p.authenticator.SignRequest(req); err != nil {
-		log.Printf("[%s] Authentication failed: %v", p.name, err)
 		return fmt.Errorf("failed to authenticate request: %w", err)
 	}
-	log.Printf("[%s] Authentication successful", p.name)
+
+	bodyBytes, _ := io.ReadAll(req.Body)
+	log.Printf("[%s] Outgoing OCI request: %s %s\nHeaders: %v\nBody: %s", p.name, req.Method, req.URL.String(), req.Header, string(bodyBytes))
+	req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 	return nil
 }
